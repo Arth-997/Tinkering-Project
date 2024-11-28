@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart'; // For formatting date and time
 
 class EntryLogs extends StatefulWidget {
   @override
@@ -8,177 +8,91 @@ class EntryLogs extends StatefulWidget {
 }
 
 class _EntryLogsState extends State<EntryLogs> {
-  String? refId;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchReferralId();
-  }
-
-  Future<void> _fetchReferralId() async {
+  // Method to fetch data from Firestore, ordered by timestamp descending
+  Future<List<Map<String, dynamic>>> _fetchLogs() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? userId = prefs.getString('user_id');
+      // Fetch all documents from the Firestore collection '1234', ordered by 'timestamp'
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('1234')
+          .orderBy('timestamp', descending: true) // Order by timestamp descending
+          .get();
 
-      if (userId != null) {
-        FirebaseFirestore db = FirebaseFirestore.instance;
+      // Map Firestore documents to a list of maps
+      return snapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-        DocumentSnapshot userDoc = await db.collection("users").doc(userId).get();
-        if (userDoc.exists) {
-          setState(() {
-            refId = userDoc.get('referralId');
-          });
-        } else {
-          print("User document does not exist.");
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User not found.')),
-          );
-        }
-      } else {
-        print("User ID not found in SharedPreferences");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User not logged in.')),
-        );
-      }
+        // Convert Firestore timestamp to DateTime
+        DateTime timestamp = DateTime.parse(data['timestamp']);
+
+        // Convert timestamp to IST
+        DateTime istTime = timestamp.add(Duration(hours: 5, minutes: 30));
+
+        // Format time of day and date in DD/MM/YY
+        String timeOfDay = DateFormat('hh:mm:ss a').format(istTime);
+        String date = DateFormat('dd/MM/yy').format(istTime);
+
+        return {
+          'succAuth': data['succAuth'],
+          'timeOfDay': timeOfDay,
+          'date': date,
+        };
+      }).toList();
     } catch (e) {
-      print("Error fetching referral ID: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching referral ID.')),
-      );
+      print("Error fetching logs: $e");
+      return [];
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Background color is set via ThemeData in main.dart
       appBar: AppBar(
-        title: Text(
-          "Entry Logs",
-          style: TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: Text('View Logs'),
+        backgroundColor: Color(0xFF03A9F4),
       ),
-      body: SingleChildScrollView(
-        // Allows the content to scroll if it overflows the screen
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            // Stretch to fill the width
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Logo
-              Center(
-                child: Image.asset(
-                  'assets/logo.png',
-                  height: 100, // Adjust the size as needed
-                ),
-              ),
-              SizedBox(height: 20), // Spacing between logo and instructions
-
-              // Instructions
-              Text(
-                'Here are your recent entry logs:',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 30), // Spacing between instructions and logs
-
-              // Display the logs or a message if no logs are found
-              refId == null
-                  ? Center(child: CircularProgressIndicator())
-                  : StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection(refId!)
-                          .orderBy('timestamp', descending: true) // Order by the 'timestamp' field in descending order
-                          .limit(100)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text(
-                              'Error fetching logs.',
-                              style: TextStyle(fontSize: 16, color: Colors.red),
-                            ),
-                          );
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'No entry logs found.',
-                              style: TextStyle(fontSize: 16, color: Colors.black54),
-                            ),
-                          );
-                        }
-
-                        final entries = snapshot.data!.docs;
-
-                        return ListView.builder(
-                          shrinkWrap: true, // Important to prevent unbounded height
-                          physics: NeverScrollableScrollPhysics(), // Disable inner scrolling
-                          itemCount: entries.length,
-                          itemBuilder: (context, index) {
-                            var entry = entries[index];
-                            bool succAuth = entry['succAuth'];
-                            String timestamp = entry['timestamp'];
-
-                            return Card(
-                              color: succAuth ? Colors.green[400] : Colors.red[400],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10.0),
-                              ),
-                              margin: EdgeInsets.symmetric(vertical: 8.0, horizontal: 0.0),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Entry: ${succAuth ? "Success" : "Failure"}',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SizedBox(height: 5),
-                                    Text(
-                                      'Document ID: ${entry.id}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    SizedBox(height: 5),
-                                    Text(
-                                      'Timestamp: $timestamp',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _fetchLogs(), // Fetch logs data
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error fetching logs'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No logs found'));
+          } else {
+            // Data exists, display logs in a ListView
+            List<Map<String, dynamic>> logs = snapshot.data!;
+            return ListView.builder(
+              itemCount: logs.length,
+              itemBuilder: (context, index) {
+                final log = logs[index];
+                bool isSuccess = log['succAuth'];
+                return Card(
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ListTile(
+                    leading: Icon(
+                      isSuccess ? Icons.lock_open : Icons.lock_outline,
+                      color: isSuccess ? Colors.green : Colors.red,
                     ),
-            ],
-          ),
-        ),
+                    title: Text(
+                      isSuccess ? 'Authorized Entry' : 'Unauthorized Access',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSuccess ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Time: ${log['timeOfDay']}\nDate: ${log['date']}',
+                      style: TextStyle(
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }

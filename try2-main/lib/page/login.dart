@@ -116,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
               // Logo
               Image.asset(
                 'assets/logo.png',
-                height: 100, // Adjust the size as needed
+                height: 150, // Adjust the size as needed
               ),
               SizedBox(height: 20), // Spacing between logo and title
 

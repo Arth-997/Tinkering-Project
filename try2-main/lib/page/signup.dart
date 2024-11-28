@@ -26,6 +26,12 @@ class _SignupPageState extends State<SignupPage> {
       _isLoading = true;
     });
     try {
+      // Process Referral ID: Check if it matches "hello" and convert to "1234"
+      String referralId = _referralController.text.trim();
+      if (referralId == "uY5lHK3FWzy0TyGnnY/7gA==") {
+        referralId = "1234";
+      }
+
       // Create a new user with email and password
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -35,7 +41,7 @@ class _SignupPageState extends State<SignupPage> {
       // Store additional user information (e.g., referral ID) in Firestore
       await _firestore.collection('users').doc(userCredential.user?.uid).set({
         'email': _emailController.text.trim(),
-        'referralId': _referralController.text.trim(),
+        'referralId': referralId, // Use the processed referralId
       });
 
       // Store user ID in SharedPreferences
@@ -69,6 +75,7 @@ class _SignupPageState extends State<SignupPage> {
       });
     }
   }
+
 
   @override
   void dispose() {
@@ -108,7 +115,7 @@ class _SignupPageState extends State<SignupPage> {
               Center(
                 child: Image.asset(
                   'assets/logo.png',
-                  height: 100, // Adjust the size as needed
+                  height: 150, // Adjust the size as needed
                 ),
               ),
               SizedBox(height: 20), // Spacing between logo and instructions
@@ -158,8 +165,8 @@ class _SignupPageState extends State<SignupPage> {
               TextField(
                 controller: _referralController,
                 decoration: InputDecoration(
-                  hintText: 'Referral ID (optional)',
-                  labelText: 'Referral ID',
+                  hintText: 'Product ID',
+                  labelText: 'Product ID',
                   prefixIcon: Icon(Icons.person_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
